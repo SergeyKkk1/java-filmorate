@@ -103,6 +103,19 @@ class FilmControllerIntegrationTest {
     }
 
     @Test
+    void updateFilmUnknown_returnsNotFound() throws Exception {
+        var unknownFilm = validFilmDto();
+        unknownFilm.setId(9999L);
+
+        mockMvc.perform(put("/films")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(unknownFilm)))
+                .andExpect(status().isNotFound());
+
+        assertThat(fetchFilms()).isEmpty();
+    }
+
+    @Test
     void addFilm_withInvalidPayload() throws Exception {
         var invalidRequest = validFilmDto();
         invalidRequest.setDescription("a".repeat(201));

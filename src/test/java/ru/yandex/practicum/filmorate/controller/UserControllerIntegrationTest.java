@@ -102,6 +102,19 @@ class UserControllerIntegrationTest {
     }
 
     @Test
+    void updateUserUnknown_returnsNotFound() throws Exception {
+        var unknownUser = validUserDto();
+        unknownUser.setId(9999L);
+
+        mockMvc.perform(put("/users")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(unknownUser)))
+                .andExpect(status().isNotFound());
+
+        assertThat(fetchUsers()).isEmpty();
+    }
+
+    @Test
     void addUser_withInvalidPayload() throws Exception {
         var invalidRequest = validUserDto();
         invalidRequest.setEmail("not-an-email");
