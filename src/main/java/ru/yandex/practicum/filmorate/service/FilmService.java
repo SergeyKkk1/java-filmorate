@@ -29,9 +29,7 @@ public class FilmService {
     public FilmDto addFilm(FilmDto filmDto) {
         Film film = filmMapper.map(filmDto);
         log.info("Adding film: {}", film.getName());
-        if (film.getId() == null) {
-            film.setId(nextId++);
-        }
+        film.setId(nextId++);
         films.put(film.getId(), film);
         return filmMapper.mapToDto(film);
     }
@@ -42,7 +40,7 @@ public class FilmService {
 
         Film updatedFilm = films.get(film.getId());
         if (updatedFilm == null) {
-            throw new FilmNotFoundException("Film not found");
+            throw new FilmNotFoundException(String.format("Film with id %s not found", film.getId()));
         }
         updatedFilm.setDescription(film.getDescription());
         updatedFilm.setName(film.getName());

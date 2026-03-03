@@ -41,7 +41,7 @@ public class UserService {
         normalizeUserName(user);
         User updatedUser = users.get(user.getId());
         if (updatedUser == null) {
-            throw new UserNotFoundException("User not found");
+            throw new UserNotFoundException(String.format("User with id %s not found", user.getId()));
         }
 
         updatedUser.setEmail(user.getEmail());
