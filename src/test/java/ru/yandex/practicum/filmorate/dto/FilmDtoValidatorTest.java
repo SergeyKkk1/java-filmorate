@@ -2,7 +2,8 @@ package ru.yandex.practicum.filmorate.dto;
 
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.junit.jupiter.api.BeforeEach;
@@ -80,7 +81,7 @@ class FilmDtoValidatorTest {
 
     @ParameterizedTest
     @MethodSource("invalidReleaseDates")
-    void releaseDateValidation_invalidValues(LocalDate releaseDate) {
+    void releaseDateValidation_invalidValues(LocalDate releaseDate, Set<Class<? extends Annotation>> expectedConstraints) {
         var dto = validFilmDto();
         dto.setReleaseDate(releaseDate);
 
@@ -88,7 +89,7 @@ class FilmDtoValidatorTest {
 
         assertThat(violations).isNotEmpty();
         assertThat(violations).allMatch(v -> v.getPropertyPath().toString().equals("releaseDate"));
-        assertThat(constraintTypesFor(violations, "releaseDate")).isEqualTo(Set.of(After.class));
+        assertThat(constraintTypesFor(violations, "releaseDate")).isEqualTo(expectedConstraints);
     }
 
     @ParameterizedTest
@@ -102,7 +103,7 @@ class FilmDtoValidatorTest {
 
     @ParameterizedTest
     @MethodSource("invalidDurations")
-    void durationValidation_invalidValues(Integer duration) {
+    void durationValidation_invalidValues(Integer duration, Set<Class<? extends Annotation>> expectedConstraints) {
         var dto = validFilmDto();
         dto.setDuration(duration);
 
@@ -110,7 +111,7 @@ class FilmDtoValidatorTest {
 
         assertThat(violations).isNotEmpty();
         assertThat(violations).allMatch(v -> v.getPropertyPath().toString().equals("duration"));
-        assertThat(constraintTypesFor(violations, "duration")).isEqualTo(Set.of(Positive.class));
+        assertThat(constraintTypesFor(violations, "duration")).isEqualTo(expectedConstraints);
     }
 
     @ParameterizedTest
@@ -153,15 +154,15 @@ class FilmDtoValidatorTest {
 
     private static Stream<Arguments> invalidNames() {
         return Stream.of(
-                Arguments.of(null, Set.of(NotEmpty.class)),
-                Arguments.of("", Set.of(NotEmpty.class))
+                Arguments.of(null, Set.of(NotBlank.class)),
+                Arguments.of("", Set.of(NotBlank.class)),
+                Arguments.of(" ", Set.of(NotBlank.class))
         );
     }
 
     private static Stream<Arguments> validNames() {
         return Stream.of(
-                Arguments.of("Film"),
-                Arguments.of(" ")
+                Arguments.of("Film")
         );
     }
 
@@ -181,14 +182,14 @@ class FilmDtoValidatorTest {
 
     private static Stream<Arguments> invalidReleaseDates() {
         return Stream.of(
-                Arguments.of(LocalDate.of(1895, 12, 27)),
-                Arguments.of(LocalDate.of(1800, 1, 1))
+                Arguments.of(null, Set.of(NotNull.class)),
+                Arguments.of(LocalDate.of(1895, 12, 27), Set.of(After.class)),
+                Arguments.of(LocalDate.of(1800, 1, 1), Set.of(After.class))
         );
     }
 
     private static Stream<Arguments> validReleaseDates() {
         return Stream.of(
-                Arguments.of((LocalDate) null),
                 Arguments.of(LocalDate.of(1895, 12, 28)),
                 Arguments.of(LocalDate.of(2000, 1, 1))
         );
@@ -196,15 +197,15 @@ class FilmDtoValidatorTest {
 
     private static Stream<Arguments> invalidDurations() {
         return Stream.of(
-                Arguments.of(0),
-                Arguments.of(-1),
-                Arguments.of(Integer.MIN_VALUE)
+                Arguments.of(null, Set.of(NotNull.class)),
+                Arguments.of(0, Set.of(Positive.class)),
+                Arguments.of(-1, Set.of(Positive.class)),
+                Arguments.of(Integer.MIN_VALUE, Set.of(Positive.class))
         );
     }
 
     private static Stream<Arguments> validDurations() {
         return Stream.of(
-                Arguments.of((Integer) null),
                 Arguments.of(1),
                 Arguments.of(120)
         );
@@ -219,4 +220,3 @@ class FilmDtoValidatorTest {
         );
     }
 }
-

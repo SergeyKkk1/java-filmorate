@@ -35,7 +35,7 @@ class FilmControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        filmService.getFilms().clear();
+        filmService.clearFilms();
     }
 
     @Test

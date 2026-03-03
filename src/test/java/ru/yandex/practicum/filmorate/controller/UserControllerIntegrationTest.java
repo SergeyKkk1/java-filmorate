@@ -35,7 +35,7 @@ class UserControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        userService.getUsers().clear();
+        userService.clearUsers();
     }
 
     @Test

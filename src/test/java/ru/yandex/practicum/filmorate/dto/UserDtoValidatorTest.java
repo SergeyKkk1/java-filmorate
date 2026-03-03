@@ -3,7 +3,8 @@ package ru.yandex.practicum.filmorate.dto;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Pattern;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,7 +92,7 @@ class UserDtoValidatorTest {
 
     @ParameterizedTest
     @MethodSource("invalidBirthdays")
-    void birthdayValidation_invalidValues(LocalDate birthday) {
+    void birthdayValidation_invalidValues(LocalDate birthday, Set<Class<? extends Annotation>> expectedConstraints) {
         var dto = validUserDto();
         dto.setBirthday(birthday);
 
@@ -99,7 +100,7 @@ class UserDtoValidatorTest {
 
         assertThat(violations).isNotEmpty();
         assertThat(violations).allMatch(v -> v.getPropertyPath().toString().equals("birthday"));
-        assertThat(constraintTypesFor(violations, "birthday")).isEqualTo(Set.of(PastOrPresent.class));
+        assertThat(constraintTypesFor(violations, "birthday")).isEqualTo(expectedConstraints);
     }
 
     @ParameterizedTest
@@ -141,8 +142,8 @@ class UserDtoValidatorTest {
 
     private static Stream<Arguments> invalidEmails() {
         return Stream.of(
-                Arguments.of(null, Set.of(NotEmpty.class)),
-                Arguments.of("", Set.of(NotEmpty.class)),
+                Arguments.of(null, Set.of(NotBlank.class)),
+                Arguments.of("", Set.of(NotBlank.class)),
                 Arguments.of("not-an-email", Set.of(Email.class)),
                 Arguments.of("a b@c.com", Set.of(Email.class))
         );
@@ -157,9 +158,9 @@ class UserDtoValidatorTest {
 
     private static Stream<Arguments> invalidLogins() {
         return Stream.of(
-                Arguments.of(null, Set.of(NotEmpty.class)),
-                Arguments.of("", Set.of(NotEmpty.class, Pattern.class)),
-                Arguments.of(" ", Set.of(Pattern.class)),
+                Arguments.of(null, Set.of(NotBlank.class)),
+                Arguments.of("", Set.of(NotBlank.class, Pattern.class)),
+                Arguments.of(" ", Set.of(NotBlank.class, Pattern.class)),
                 Arguments.of("john doe", Set.of(Pattern.class)),
                 Arguments.of("john\tdoe", Set.of(Pattern.class)),
                 Arguments.of("john\ndoe", Set.of(Pattern.class))
@@ -176,13 +177,13 @@ class UserDtoValidatorTest {
 
     private static Stream<Arguments> invalidBirthdays() {
         return Stream.of(
-                Arguments.of(TODAY.plusDays(1))
+                Arguments.of(null, Set.of(NotNull.class)),
+                Arguments.of(TODAY.plusDays(1), Set.of(PastOrPresent.class))
         );
     }
 
     private static Stream<Arguments> validBirthdays() {
         return Stream.of(
-                Arguments.of((LocalDate) null),
                 Arguments.of(TODAY.minusDays(1)),
                 Arguments.of(TODAY),
                 Arguments.of(LocalDate.of(1900, 1, 1))

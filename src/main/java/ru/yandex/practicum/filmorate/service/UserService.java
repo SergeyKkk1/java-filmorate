@@ -1,54 +1,65 @@
 package ru.yandex.practicum.filmorate.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
+import ru.yandex.practicum.filmorate.dto.UserDto;
+import ru.yandex.practicum.filmorate.dto.mapper.UserMapper;
+import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
 import ru.yandex.practicum.filmorate.model.User;
 
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class UserService {
-    private final List<User> users = new ArrayList<>();
+    private final Map<Long, User> users = new LinkedHashMap<>();
+    private final UserMapper userMapper;
     private long nextId = 1;
 
-    public List<User> getUsers() {
-        return users;
+    public List<UserDto> getUsers() {
+        return users.values().stream()
+                .map(userMapper::mapToDto)
+                .toList();
     }
 
-    public User addUser(User user) {
+    public UserDto addUser(UserDto userDto) {
+        User user = userMapper.map(userDto);
         log.info("Adding user: {}", user.getLogin());
-        if (user.getId() == null) {
-            user.setId(nextId++);
-        }
-        if (user.getName() == null) {
-            user.setName(user.getLogin());
-        }
-        users.add(user);
-        return user;
+        user.setId(nextId++);
+        normalizeUserName(user);
+        users.put(user.getId(), user);
+        return userMapper.mapToDto(user);
     }
 
-    public User updateUser(User user) {
+    public UserDto updateUser(UserDto userDto) {
+        User user = userMapper.map(userDto);
         log.info("Updating user: {} with id {}", user.getLogin(), user.getId());
-        if (user.getName() == null) {
-            user.setName(user.getLogin());
+        normalizeUserName(user);
+        User updatedUser = users.get(user.getId());
+        if (updatedUser == null) {
+            throw new UserNotFoundException("User not found");
         }
-        Optional<User> foundUser = users.stream()
-                .filter(u -> user.getId().equals(u.getId()))
-                .findFirst();
-        if (foundUser.isPresent()) {
-            var updatedUser = foundUser.get();
-            updatedUser.setEmail(user.getEmail());
-            updatedUser.setLogin(user.getLogin());
-            updatedUser.setName(user.getName());
-            updatedUser.setBirthday(user.getBirthday());
-            return updatedUser;
-        } else {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found");
+
+        updatedUser.setEmail(user.getEmail());
+        updatedUser.setLogin(user.getLogin());
+        updatedUser.setName(user.getName());
+        updatedUser.setBirthday(user.getBirthday());
+
+        return userMapper.mapToDto(updatedUser);
+    }
+
+    public void clearUsers() {
+        users.clear();
+        nextId = 1;
+    }
+
+    private void normalizeUserName(User user) {
+        if (user.getName() == null || user.getName().isBlank()) {
+            user.setName(user.getLogin());
         }
     }
 }
