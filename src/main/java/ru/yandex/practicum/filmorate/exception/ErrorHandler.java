@@ -20,4 +20,3 @@ public class ErrorHandler {
         return Map.of("error", exception.getMessage());
     }
 }
-

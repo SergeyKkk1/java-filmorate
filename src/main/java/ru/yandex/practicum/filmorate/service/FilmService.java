@@ -6,22 +6,24 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dto.FilmDto;
 import ru.yandex.practicum.filmorate.dto.mapper.FilmMapper;
 import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
+import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.util.LinkedHashMap;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class FilmService {
-    private final Map<Long, Film> films = new LinkedHashMap<>();
+    private final FilmStorage filmStorage;
+    private final UserStorage userStorage;
     private final FilmMapper filmMapper;
-    private long nextId = 1;
 
     public List<FilmDto> getFilms() {
-        return films.values().stream()
+        return filmStorage.getFilms().stream()
                 .map(filmMapper::mapToDto)
                 .toList();
     }
@@ -29,16 +31,14 @@ public class FilmService {
     public FilmDto addFilm(FilmDto filmDto) {
         Film film = filmMapper.map(filmDto);
         log.info("Adding film: {}", film.getName());
-        film.setId(nextId++);
-        films.put(film.getId(), film);
-        return filmMapper.mapToDto(film);
+        return filmMapper.mapToDto(filmStorage.addFilm(film));
     }
 
     public FilmDto updateFilm(FilmDto filmDto) {
         Film film = filmMapper.map(filmDto);
         log.info("Updating film: {} with id {}", film.getName(), film.getId());
 
-        Film updatedFilm = films.get(film.getId());
+        Film updatedFilm = filmStorage.getFilmById(film.getId());
         if (updatedFilm == null) {
             throw new FilmNotFoundException(String.format("Film with id %s not found", film.getId()));
         }
@@ -46,11 +46,47 @@ public class FilmService {
         updatedFilm.setName(film.getName());
         updatedFilm.setReleaseDate(film.getReleaseDate());
         updatedFilm.setDuration(film.getDuration());
+        filmStorage.updateFilm(updatedFilm);
         return filmMapper.mapToDto(updatedFilm);
     }
 
     public void clearFilms() {
-        films.clear();
-        nextId = 1;
+        filmStorage.clear();
+    }
+
+    public void addLike(Long id, Long userId) {
+        Film film = getRequiredFilm(id);
+        validateUserExists(userId);
+        film.getLikedUsers().add(userId);
+        filmStorage.updateFilm(film);
+    }
+
+    public void deleteLike(Long id, Long userId) {
+        Film film = getRequiredFilm(id);
+        validateUserExists(userId);
+        film.getLikedUsers().remove(userId);
+        filmStorage.updateFilm(film);
+    }
+
+    private Film getRequiredFilm(Long id) {
+        Film film = filmStorage.getFilmById(id);
+        if (film == null) {
+            throw new FilmNotFoundException(String.format("Film with id %s not found", id));
+        }
+        return film;
+    }
+
+    private void validateUserExists(Long userId) {
+        if (userStorage.getUserById(userId) == null) {
+            throw new UserNotFoundException(String.format("User with id %s not found", userId));
+        }
+    }
+
+    public List<FilmDto> popular(int count) {
+        return filmStorage.getFilms().stream()
+                .sorted(Comparator.comparing(film -> film.getLikedUsers().size(), Comparator.reverseOrder()))
+                .limit(count)
+                .map(filmMapper::mapToDto)
+                .toList();
     }
 }
