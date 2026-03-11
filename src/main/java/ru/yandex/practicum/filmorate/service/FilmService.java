@@ -23,6 +23,7 @@ public class FilmService {
     private final FilmMapper filmMapper;
 
     public List<FilmDto> getFilms() {
+        log.info("Fetching all films");
         return filmStorage.getFilms().stream()
                 .map(filmMapper::mapToDto)
                 .toList();
@@ -38,10 +39,8 @@ public class FilmService {
         Film film = filmMapper.map(filmDto);
         log.info("Updating film: {} with id {}", film.getName(), film.getId());
 
-        Film updatedFilm = filmStorage.getFilmById(film.getId());
-        if (updatedFilm == null) {
-            throw new FilmNotFoundException(String.format("Film with id %s not found", film.getId()));
-        }
+        Film updatedFilm = filmStorage.getFilmById(film.getId())
+                .orElseThrow(() -> new FilmNotFoundException(String.format("Film with id %s not found", film.getId())));
         updatedFilm.setDescription(film.getDescription());
         updatedFilm.setName(film.getName());
         updatedFilm.setReleaseDate(film.getReleaseDate());
@@ -51,10 +50,12 @@ public class FilmService {
     }
 
     public void clearFilms() {
+        log.info("Clearing all films");
         filmStorage.clear();
     }
 
     public void addLike(Long id, Long userId) {
+        log.info("Adding like to film {} from user {}", id, userId);
         Film film = getRequiredFilm(id);
         validateUserExists(userId);
         film.getLikedUsers().add(userId);
@@ -62,31 +63,30 @@ public class FilmService {
     }
 
     public void deleteLike(Long id, Long userId) {
+        log.info("Deleting like from film {} by user {}", id, userId);
         Film film = getRequiredFilm(id);
         validateUserExists(userId);
         film.getLikedUsers().remove(userId);
         filmStorage.updateFilm(film);
     }
 
-    private Film getRequiredFilm(Long id) {
-        Film film = filmStorage.getFilmById(id);
-        if (film == null) {
-            throw new FilmNotFoundException(String.format("Film with id %s not found", id));
-        }
-        return film;
-    }
-
-    private void validateUserExists(Long userId) {
-        if (userStorage.getUserById(userId) == null) {
-            throw new UserNotFoundException(String.format("User with id %s not found", userId));
-        }
-    }
-
     public List<FilmDto> popular(int count) {
+        log.info("Fetching {} popular films", count);
         return filmStorage.getFilms().stream()
                 .sorted(Comparator.comparing(film -> film.getLikedUsers().size(), Comparator.reverseOrder()))
                 .limit(count)
                 .map(filmMapper::mapToDto)
                 .toList();
+    }
+
+    private Film getRequiredFilm(Long id) {
+        return filmStorage.getFilmById(id)
+                .orElseThrow(() -> new FilmNotFoundException(String.format("Film with id %s not found", id)));
+    }
+
+    private void validateUserExists(Long userId) {
+        if (userStorage.getUserById(userId).isEmpty()) {
+            throw new UserNotFoundException(String.format("User with id %s not found", userId));
+        }
     }
 }

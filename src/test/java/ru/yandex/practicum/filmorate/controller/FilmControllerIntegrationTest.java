@@ -147,7 +147,7 @@ class FilmControllerIntegrationTest {
         mockMvc.perform(put("/films/{id}/like/{userId}", film.getId(), userId))
                 .andExpect(status().isOk());
 
-        assertThat(filmStorage.getFilmById(film.getId()).getLikedUsers()).contains(userId);
+        assertThat(filmStorage.getFilmById(film.getId()).orElseThrow().getLikedUsers()).contains(userId);
     }
 
     @Test
@@ -160,7 +160,7 @@ class FilmControllerIntegrationTest {
         mockMvc.perform(delete("/films/{id}/like/{userId}", film.getId(), userId))
                 .andExpect(status().isOk());
 
-        assertThat(filmStorage.getFilmById(film.getId()).getLikedUsers()).doesNotContain(userId);
+        assertThat(filmStorage.getFilmById(film.getId()).orElseThrow().getLikedUsers()).doesNotContain(userId);
     }
 
     @Test
@@ -197,6 +197,12 @@ class FilmControllerIntegrationTest {
         assertThat(popularFilmResponse.size()).isEqualTo(2);
         assertThat(popularFilmResponse.getFirst()).isEqualTo(secondFilm);
         assertThat(popularFilmResponse.getLast()).isEqualTo(firstFilm);
+    }
+
+    @Test
+    void popular_zeroCount() throws Exception {
+        mockMvc.perform(get("/films/popular").param("count", "0"))
+                .andExpect(status().isBadRequest());
     }
 
     private FilmDto validFilmDto() {

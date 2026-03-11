@@ -167,8 +167,8 @@ class UserControllerIntegrationTest {
         mockMvc.perform(put("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
 
-        assertThat(userStorage.getUserById(firstUser.getId()).getFriends()).contains(secondUser.getId());
-        assertThat(userStorage.getUserById(secondUser.getId()).getFriends()).contains(firstUser.getId());
+        assertThat(userStorage.getUserById(firstUser.getId()).orElseThrow().getFriends()).contains(secondUser.getId());
+        assertThat(userStorage.getUserById(secondUser.getId()).orElseThrow().getFriends()).contains(firstUser.getId());
     }
 
     @Test
@@ -178,6 +178,14 @@ class UserControllerIntegrationTest {
 
         mockMvc.perform(put("/users/{id}/friends/{friendId}", existingUser.getId(), unknownId))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void addFriend_sameUserId_returnsBadRequest() throws Exception {
+        var user = createUser(validUserDto());
+
+        mockMvc.perform(put("/users/{id}/friends/{friendId}", user.getId(), user.getId()))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -191,8 +199,18 @@ class UserControllerIntegrationTest {
         mockMvc.perform(delete("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
 
-        assertThat(userStorage.getUserById(firstUser.getId()).getFriends()).doesNotContain(secondUser.getId());
-        assertThat(userStorage.getUserById(secondUser.getId()).getFriends()).doesNotContain(firstUser.getId());
+        assertThat(userStorage.getUserById(firstUser.getId()).orElseThrow().getFriends())
+                .doesNotContain(secondUser.getId());
+        assertThat(userStorage.getUserById(secondUser.getId()).orElseThrow().getFriends())
+                .doesNotContain(firstUser.getId());
+    }
+
+    @Test
+    void deleteFriend_sameUserId() throws Exception {
+        var user = createUser(validUserDto());
+
+        mockMvc.perform(delete("/users/{id}/friends/{friendId}", user.getId(), user.getId()))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -253,6 +271,14 @@ class UserControllerIntegrationTest {
         var friends = getCommonFriends(firstUser.getId(), secondUser.getId());
 
         assertThat(friends).isEmpty();
+    }
+
+    @Test
+    void getCommonFriends_sameUserId() throws Exception {
+        var user = createUser(validUserDto());
+
+        mockMvc.perform(get("/users/{id}/friends/common/{otherId}", user.getId(), user.getId()))
+                .andExpect(status().isBadRequest());
     }
 
     private UserDto validUserDto() {

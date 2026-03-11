@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import ru.yandex.practicum.filmorate.dto.FilmDto;
 import ru.yandex.practicum.filmorate.exception.FilmIdIsNullException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.service.FilmService;
 
 import java.util.List;
@@ -59,6 +60,9 @@ public class FilmController {
 
     @GetMapping("/popular")
     public List<FilmDto> popular(@RequestParam(defaultValue = "10") int count) {
+        if (count <= 0) {
+            throw new ValidationException("Count must be positive");
+        }
         return filmService.popular(count);
     }
 }
