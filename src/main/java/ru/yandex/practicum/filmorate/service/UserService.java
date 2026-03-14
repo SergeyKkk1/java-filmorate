@@ -6,22 +6,25 @@ import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dto.UserDto;
 import ru.yandex.practicum.filmorate.dto.mapper.UserMapper;
 import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
+import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.model.User;
+import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class UserService {
-    private final Map<Long, User> users = new LinkedHashMap<>();
+    private final UserStorage userStorage;
     private final UserMapper userMapper;
-    private long nextId = 1;
 
     public List<UserDto> getUsers() {
-        return users.values().stream()
+        log.info("Fetching all users");
+        return userStorage.getUsers().stream()
                 .map(userMapper::mapToDto)
                 .toList();
     }
@@ -29,9 +32,8 @@ public class UserService {
     public UserDto addUser(UserDto userDto) {
         User user = userMapper.map(userDto);
         log.info("Adding user: {}", user.getLogin());
-        user.setId(nextId++);
         normalizeUserName(user);
-        users.put(user.getId(), user);
+        userStorage.addUser(user);
         return userMapper.mapToDto(user);
     }
 
@@ -39,22 +41,83 @@ public class UserService {
         User user = userMapper.map(userDto);
         log.info("Updating user: {} with id {}", user.getLogin(), user.getId());
         normalizeUserName(user);
-        User updatedUser = users.get(user.getId());
-        if (updatedUser == null) {
-            throw new UserNotFoundException(String.format("User with id %s not found", user.getId()));
-        }
+        User updatedUser = getRequiredUser(user.getId());
 
         updatedUser.setEmail(user.getEmail());
         updatedUser.setLogin(user.getLogin());
         updatedUser.setName(user.getName());
         updatedUser.setBirthday(user.getBirthday());
+        userStorage.updateUser(updatedUser);
 
         return userMapper.mapToDto(updatedUser);
     }
 
     public void clearUsers() {
-        users.clear();
-        nextId = 1;
+        log.info("Clearing all users");
+        userStorage.clear();
+    }
+
+    public UserDto getUser(Long id) {
+        log.info("Fetching user with id {}", id);
+        return userMapper.mapToDto(getRequiredUser(id));
+    }
+
+    public void addFriend(Long id, Long friendId) {
+        log.info("Adding friend: user {} -> friend {}", id, friendId);
+        validateDifferentUserIds(id, friendId);
+        User user = getRequiredUser(id);
+        User friend = getRequiredUser(friendId);
+        user.getFriends().add(friendId);
+        friend.getFriends().add(id);
+
+        userStorage.updateUser(user);
+        userStorage.updateUser(friend);
+    }
+
+    public void deleteFriend(Long id, Long friendId) {
+        log.info("Deleting friend: user {} -> friend {}", id, friendId);
+        validateDifferentUserIds(id, friendId);
+        User user = getRequiredUser(id);
+        User friend = getRequiredUser(friendId);
+        user.getFriends().remove(friendId);
+        friend.getFriends().remove(id);
+
+        userStorage.updateUser(user);
+        userStorage.updateUser(friend);
+    }
+
+    public List<UserDto> getFriends(Long id) {
+        log.info("Fetching friends for user {}", id);
+        User user = getRequiredUser(id);
+        return user.getFriends().stream()
+                .map(userStorage::getUserById)
+                .flatMap(Optional::stream)
+                .map(userMapper::mapToDto)
+                .toList();
+    }
+
+    private User getRequiredUser(Long id) {
+        return userStorage.getUserById(id)
+                .orElseThrow(() -> new UserNotFoundException(String.format("User with id %s not found", id)));
+    }
+
+    public List<UserDto> getCommonFriends(Long id, Long otherId) {
+        log.info("Fetching common friends for users {} and {}", id, otherId);
+        validateDifferentUserIds(id, otherId);
+        User firstUser = getRequiredUser(id);
+        User secondUser = getRequiredUser(otherId);
+        Set<Long> commonFriendIds = new HashSet<>(firstUser.getFriends());
+        commonFriendIds.retainAll(secondUser.getFriends());
+        return commonFriendIds.stream()
+                .map(this::getRequiredUser)
+                .map(userMapper::mapToDto)
+                .toList();
+    }
+
+    private void validateDifferentUserIds(Long firstId, Long secondId) {
+        if (firstId != null && firstId.equals(secondId)) {
+            throw new ValidationException("User id and friend id must be different");
+        }
     }
 
     private void normalizeUserName(User user) {
