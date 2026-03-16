@@ -31,14 +31,14 @@ class FilmDtoValidatorTest {
 
     @Test
     void validFilm_hasNoViolations() {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         assertThat(validator.validate(dto)).isEmpty();
     }
 
     @ParameterizedTest
     @MethodSource("invalidNames")
     void nameValidation_invalidValues(String name, Set<Class<? extends Annotation>> expectedConstraints) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setName(name);
 
         var violations = validator.validate(dto);
@@ -51,7 +51,7 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("validNames")
     void nameValidation_validValues(String name) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setName(name);
 
         assertThat(validator.validate(dto)).isEmpty();
@@ -60,7 +60,7 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("invalidDescriptions")
     void descriptionValidation_invalidValues(String description) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setDescription(description);
 
         var violations = validator.validate(dto);
@@ -73,7 +73,7 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("validDescriptions")
     void descriptionValidation_validValues(String description) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setDescription(description);
 
         assertThat(validator.validate(dto)).isEmpty();
@@ -82,7 +82,7 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("invalidReleaseDates")
     void releaseDateValidation_invalidValues(LocalDate releaseDate, Set<Class<? extends Annotation>> expectedConstraints) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setReleaseDate(releaseDate);
 
         var violations = validator.validate(dto);
@@ -95,7 +95,7 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("validReleaseDates")
     void releaseDateValidation_validValues(LocalDate releaseDate) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setReleaseDate(releaseDate);
 
         assertThat(validator.validate(dto)).isEmpty();
@@ -104,7 +104,7 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("invalidDurations")
     void durationValidation_invalidValues(Integer duration, Set<Class<? extends Annotation>> expectedConstraints) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setDuration(duration);
 
         var violations = validator.validate(dto);
@@ -117,8 +117,17 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("validDurations")
     void durationValidation_validValues(Integer duration) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setDuration(duration);
+
+        assertThat(validator.validate(dto)).isEmpty();
+    }
+
+    @ParameterizedTest
+    @MethodSource("validContentRatings")
+    void contentRatingValidation_validValues(Long contentRating) {
+        var dto = validFilmRqDto();
+        dto.setMpa(new IdDto().setId(contentRating));
 
         assertThat(validator.validate(dto)).isEmpty();
     }
@@ -126,24 +135,26 @@ class FilmDtoValidatorTest {
     @ParameterizedTest
     @MethodSource("validIds")
     void id_hasNoValidationConstraints(Long id) {
-        var dto = validFilmDto();
+        var dto = validFilmRqDto();
         dto.setId(id);
 
         assertThat(validator.validate(dto)).isEmpty();
     }
 
-    private static FilmDto validFilmDto() {
-        var dto = new FilmDto();
+    private static FilmRqDto validFilmRqDto() {
+        var dto = new FilmRqDto();
         dto.setId(1L);
         dto.setName("Inception");
         dto.setDescription("A valid description");
         dto.setReleaseDate(LocalDate.of(2010, 7, 16));
         dto.setDuration(148);
+        dto.setMpa(new IdDto().setId(3L));
+        dto.setGenres(Set.of(new IdDto().setId(1L), new IdDto().setId(4L)));
         return dto;
     }
 
     private static Set<Class<? extends Annotation>> constraintTypesFor(
-            Set<jakarta.validation.ConstraintViolation<FilmDto>> violations,
+            Set<jakarta.validation.ConstraintViolation<FilmRqDto>> violations,
             String property
     ) {
         return violations.stream()
@@ -208,6 +219,13 @@ class FilmDtoValidatorTest {
         return Stream.of(
                 Arguments.of(1),
                 Arguments.of(120)
+        );
+    }
+
+    private static Stream<Arguments> validContentRatings() {
+        return Stream.of(
+                Arguments.of(1L),
+                Arguments.of(5L)
         );
     }
 

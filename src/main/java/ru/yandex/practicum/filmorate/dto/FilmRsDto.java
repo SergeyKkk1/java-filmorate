@@ -1,26 +1,20 @@
-package ru.yandex.practicum.filmorate.model;
+package ru.yandex.practicum.filmorate.dto;
 
 import lombok.Data;
 import lombok.experimental.Accessors;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
-/**
- * Film.
- */
 @Data
 @Accessors(chain = true)
-public class Film {
+public class FilmRsDto {
     private Long id;
     private String name;
     private String description;
     private LocalDate releaseDate;
     private Integer duration;
-    private Long contentRating;
-    private List<Long> genres = new ArrayList<>();
-    private Set<Long> likedUsers = new HashSet<>();
+    private ContentRatingDto mpa;
+    private List<GenreDto> genres = new ArrayList<>();
 }

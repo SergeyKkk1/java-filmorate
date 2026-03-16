@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dto.UserDto;
 import ru.yandex.practicum.filmorate.dto.mapper.UserMapper;
@@ -19,6 +20,7 @@ import java.util.Set;
 @Slf4j
 @RequiredArgsConstructor
 public class UserService {
+    @Qualifier("userDbStorage")
     private final UserStorage userStorage;
     private final UserMapper userMapper;
 
@@ -66,30 +68,26 @@ public class UserService {
         log.info("Adding friend: user {} -> friend {}", id, friendId);
         validateDifferentUserIds(id, friendId);
         User user = getRequiredUser(id);
-        User friend = getRequiredUser(friendId);
+        getRequiredUser(friendId);
         user.getFriends().add(friendId);
-        friend.getFriends().add(id);
-
         userStorage.updateUser(user);
-        userStorage.updateUser(friend);
     }
 
     public void deleteFriend(Long id, Long friendId) {
         log.info("Deleting friend: user {} -> friend {}", id, friendId);
         validateDifferentUserIds(id, friendId);
         User user = getRequiredUser(id);
-        User friend = getRequiredUser(friendId);
+        getRequiredUser(friendId);
         user.getFriends().remove(friendId);
-        friend.getFriends().remove(id);
 
         userStorage.updateUser(user);
-        userStorage.updateUser(friend);
     }
 
     public List<UserDto> getFriends(Long id) {
         log.info("Fetching friends for user {}", id);
         User user = getRequiredUser(id);
         return user.getFriends().stream()
+                .sorted()
                 .map(userStorage::getUserById)
                 .flatMap(Optional::stream)
                 .map(userMapper::mapToDto)
@@ -109,6 +107,7 @@ public class UserService {
         Set<Long> commonFriendIds = new HashSet<>(firstUser.getFriends());
         commonFriendIds.retainAll(secondUser.getFriends());
         return commonFriendIds.stream()
+                .sorted()
                 .map(this::getRequiredUser)
                 .map(userMapper::mapToDto)
                 .toList();

@@ -14,7 +14,9 @@ public class ErrorHandler {
             FilmIdIsNullException.class,
             UserIdIsNullException.class,
             FilmNotFoundException.class,
-            UserNotFoundException.class
+            UserNotFoundException.class,
+            GenreNotFoundException.class,
+            ContentRatingNotFoundException.class
     })
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public Map<String, String> handleNotFoundExceptions(RuntimeException exception) {
