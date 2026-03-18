@@ -6,22 +6,24 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dto.FilmRqDto;
 import ru.yandex.practicum.filmorate.dto.FilmRsDto;
-import ru.yandex.practicum.filmorate.dto.GenreDto;
+import ru.yandex.practicum.filmorate.dto.IdDto;
 import ru.yandex.practicum.filmorate.dto.mapper.FilmMapper;
 import ru.yandex.practicum.filmorate.exception.ContentRatingNotFoundException;
 import ru.yandex.practicum.filmorate.exception.FilmNotFoundException;
 import ru.yandex.practicum.filmorate.exception.GenreNotFoundException;
 import ru.yandex.practicum.filmorate.exception.UserNotFoundException;
+import ru.yandex.practicum.filmorate.model.ContentRating;
 import ru.yandex.practicum.filmorate.model.Film;
+import ru.yandex.practicum.filmorate.model.Genre;
+import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.storage.content.ContentRatingStorage;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import ru.yandex.practicum.filmorate.storage.genre.GenreStorage;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashSet;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Slf4j
@@ -38,30 +40,35 @@ public class FilmService {
 
     public List<FilmRsDto> getFilms() {
         log.info("Fetching all films");
-        return filmStorage.getFilms().stream()
-                .map(this::toResponseDto)
+        Collection<Film> films = filmStorage.getFilms();
+        List<Long> filmIds = films.stream().map(Film::getId).toList();
+        Map<Long, List<User>> filmIdToLikedUsers = filmStorage.getFilmIdToLikedUsers(filmIds);
+        Map<Long, List<Genre>> filmIdToGenres = genreStorage.getFilmIdToGenres(filmIds);
+        return films.stream()
+                .map(film -> film.setLikedUsers(filmIdToLikedUsers.get(film.getId())))
+                .map(film -> film.setGenres(filmIdToGenres.get(film.getId())))
+                .map(filmMapper::mapToRsDto)
                 .toList();
     }
 
     public FilmRsDto getFilm(Long id) {
         log.info("Fetching film with id {}", id);
-        return toResponseDto(getRequiredFilm(id));
+        return filmMapper.mapToRsDto(getRequiredFilm(id));
     }
 
     public FilmRsDto addFilm(FilmRqDto filmDto) {
         Film film = filmMapper.map(filmDto);
-        film.setGenres(normalizeGenres(film.getGenres()));
-        validateFilmReferences(film);
         log.info("Adding film: {}", film.getName());
-        return toResponseDto(filmStorage.addFilm(film));
+        setFilmGenres(film, filmDto);
+        setFilmContentRating(film, filmDto);
+        return filmMapper.mapToRsDto(filmStorage.addFilm(film));
     }
 
     public FilmRsDto updateFilm(FilmRqDto filmDto) {
         Film film = filmMapper.map(filmDto);
-        film.setGenres(normalizeGenres(film.getGenres()));
-        validateFilmReferences(film);
+        setFilmGenres(film, filmDto);
+        setFilmContentRating(film, filmDto);
         log.info("Updating film: {} with id {}", film.getName(), film.getId());
-
         Film updatedFilm = filmStorage.getFilmById(film.getId())
                 .orElseThrow(() -> new FilmNotFoundException(String.format("Film with id %s not found", film.getId())));
         updatedFilm.setDescription(film.getDescription());
@@ -69,9 +76,16 @@ public class FilmService {
         updatedFilm.setReleaseDate(film.getReleaseDate());
         updatedFilm.setDuration(film.getDuration());
         updatedFilm.setContentRating(film.getContentRating());
-        updatedFilm.setGenres(normalizeGenres(film.getGenres()));
+        updatedFilm.setGenres(film.getGenres());
         filmStorage.updateFilm(updatedFilm);
-        return toResponseDto(updatedFilm);
+        return filmMapper.mapToRsDto(updatedFilm);
+    }
+
+    private void setFilmGenres(Film film, FilmRqDto filmDto) {
+        List<Long> genreIds = filmDto.getGenres() == null ? List.of() : filmDto.getGenres().stream().map(IdDto::getId).toList();
+        List<Genre> genres = genreStorage.findGenres(genreIds);
+        validateFilmReferences(film, genres);
+        film.setGenres(genres);
     }
 
     public void clearFilms() {
@@ -81,33 +95,36 @@ public class FilmService {
 
     public void addLike(Long id, Long userId) {
         log.info("Adding like to film {} from user {}", id, userId);
-        Film film = getRequiredFilm(id);
+        validateFilmExists(id);
         validateUserExists(userId);
-        film.getLikedUsers().add(userId);
-        filmStorage.updateFilm(film);
+        filmStorage.addLike(id, userId);
     }
 
     public void deleteLike(Long id, Long userId) {
         log.info("Deleting like from film {} by user {}", id, userId);
-        Film film = getRequiredFilm(id);
+        validateFilmExists(id);
         validateUserExists(userId);
-        film.getLikedUsers().remove(userId);
-        filmStorage.updateFilm(film);
+        filmStorage.removeLike(id, userId);
     }
 
     public List<FilmRsDto> popular(int count) {
         log.info("Fetching {} popular films", count);
-        return filmStorage.getFilms().stream()
-                .sorted(Comparator.comparing((Film film) -> film.getLikedUsers().size(), Comparator.reverseOrder())
-                        .thenComparing(Film::getId))
-                .limit(count)
-                .map(this::toResponseDto)
+        Collection<Film> films = filmStorage.getPopularFilms(count);
+        List<Long> filmIds = films.stream().map(Film::getId).toList();
+        Map<Long, List<Genre>> filmIdToGenres = genreStorage.getFilmIdToGenres(filmIds);
+        Map<Long, List<User>> filmIdToLikedUsers = filmStorage.getFilmIdToLikedUsers(filmIds);
+        return films.stream()
+                .map(film -> film.setGenres(filmIdToGenres.get(film.getId())))
+                .map(film -> film.setLikedUsers(filmIdToLikedUsers.get(film.getId())))
+                .map(filmMapper::mapToRsDto)
                 .toList();
     }
 
     private Film getRequiredFilm(Long id) {
-        return filmStorage.getFilmById(id)
+        Film film = filmStorage.getFilmById(id)
                 .orElseThrow(() -> new FilmNotFoundException(String.format("Film with id %s not found", id)));
+        film.setGenres(genreStorage.getGenresByFilmId(id));
+        return film;
     }
 
     private void validateUserExists(Long userId) {
@@ -116,8 +133,14 @@ public class FilmService {
         }
     }
 
-    private void validateFilmReferences(Film film) {
-        if (film.getContentRating() != null && contentRatingStorage.getRatingById(film.getContentRating()).isEmpty()) {
+    private void validateFilmExists(Long filmId) {
+        if (filmStorage.getFilmById(filmId).isEmpty()) {
+            throw new FilmNotFoundException(String.format("Film with id %s not found", filmId));
+        }
+    }
+
+    private void validateFilmReferences(Film film, List<Genre> genres) {
+        if (film.getContentRating() != null && contentRatingStorage.getRatingById(film.getContentRating().getId()).isEmpty()) {
             throw new ContentRatingNotFoundException(
                     String.format("Content rating with id %s not found", film.getContentRating())
             );
@@ -127,48 +150,17 @@ public class FilmService {
             return;
         }
 
-        for (Long genreId : film.getGenres()) {
-            if (genreId == null || genreStorage.getGenreById(genreId).isEmpty()) {
-                throw new GenreNotFoundException(String.format("Genre with id %s not found", genreId));
-            }
+        if (film.getGenres().size() != genres.size()) {
+            throw new GenreNotFoundException("Some of genres not found");
         }
     }
 
-    private List<Long> normalizeGenres(List<Long> genres) {
-        if (genres == null || genres.isEmpty()) {
-            return new ArrayList<>();
+    private void setFilmContentRating(Film film, FilmRqDto filmDto) {
+        if (filmDto.getMpa() != null) {
+            ContentRating rating = contentRatingStorage.getRatingById(filmDto.getMpa().getId()).orElseThrow(() -> new ContentRatingNotFoundException(
+                    String.format("Content rating with id %s not found", filmDto.getMpa().getId())
+            ));
+            film.setContentRating(rating);
         }
-        return new ArrayList<>(new LinkedHashSet<>(genres));
-    }
-
-    private FilmRsDto toResponseDto(Film film) {
-        FilmRsDto filmRsDto = filmMapper.mapToRsDto(film);
-
-        if (filmRsDto.getMpa() != null && filmRsDto.getMpa().getId() != null) {
-            String ratingName = contentRatingStorage.getRatingById(filmRsDto.getMpa().getId())
-                    .orElseThrow(() -> new ContentRatingNotFoundException(
-                            String.format("Content rating with id %s not found", filmRsDto.getMpa().getId())
-                    ))
-                    .getName();
-            filmRsDto.getMpa().setName(ratingName);
-        }
-
-        if (filmRsDto.getGenres() == null) {
-            filmRsDto.setGenres(new ArrayList<>());
-            return filmRsDto;
-        }
-
-        for (GenreDto genreDto : filmRsDto.getGenres()) {
-            if (genreDto == null || genreDto.getId() == null) {
-                continue;
-            }
-            String genreName = genreStorage.getGenreById(genreDto.getId())
-                    .orElseThrow(() -> new GenreNotFoundException(
-                            String.format("Genre with id %s not found", genreDto.getId())
-                    ))
-                    .getName();
-            genreDto.setName(genreName);
-        }
-        return filmRsDto;
     }
 }

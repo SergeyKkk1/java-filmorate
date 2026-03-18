@@ -11,11 +11,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.filmorate.dto.UserDto;
+import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -172,8 +175,8 @@ class UserControllerIntegrationTest {
         mockMvc.perform(put("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
 
-        assertThat(userStorage.getUserById(firstUser.getId()).orElseThrow().getFriends()).contains(secondUser.getId());
-        assertThat(userStorage.getUserById(secondUser.getId()).orElseThrow().getFriends()).isEmpty();
+        assertThat(getUserFriendIds(firstUser)).contains(secondUser.getId());
+        assertThat(getUserFriendIds(secondUser)).isEmpty();
     }
 
     @Test
@@ -200,18 +203,20 @@ class UserControllerIntegrationTest {
 
         mockMvc.perform(put("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
-        assertThat(userStorage.getUserById(firstUser.getId()).orElseThrow().getFriends())
-                .contains(secondUser.getId());
-        assertThat(userStorage.getUserById(secondUser.getId()).orElseThrow().getFriends())
-                .doesNotContain(firstUser.getId());
+        assertThat(getUserFriendIds(firstUser)).contains(secondUser.getId());
+        assertThat(getUserFriendIds(secondUser)).doesNotContain(firstUser.getId());
 
         mockMvc.perform(delete("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
 
-        assertThat(userStorage.getUserById(firstUser.getId()).orElseThrow().getFriends())
-                .doesNotContain(secondUser.getId());
-        assertThat(userStorage.getUserById(secondUser.getId()).orElseThrow().getFriends())
-                .doesNotContain(firstUser.getId());
+        assertThat(getUserFriendIds(firstUser)).doesNotContain(secondUser.getId());
+        assertThat(getUserFriendIds(secondUser)).doesNotContain(firstUser.getId());
+    }
+
+    private Set<Long> getUserFriendIds(UserDto firstUser) {
+        return userStorage.getUserFriends(firstUser.getId()).stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
     }
 
     @Test

@@ -15,6 +15,7 @@ import ru.yandex.practicum.filmorate.dto.FilmRsDto;
 import ru.yandex.practicum.filmorate.dto.GenreDto;
 import ru.yandex.practicum.filmorate.dto.IdDto;
 import ru.yandex.practicum.filmorate.dto.UserDto;
+import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.FilmService;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
@@ -22,6 +23,7 @@ import ru.yandex.practicum.filmorate.storage.film.FilmStorage;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -124,6 +126,25 @@ class FilmControllerIntegrationTest {
     }
 
     @Test
+    void getFilmById_returnsGenres() throws Exception {
+        var createdFilm = createFilm(validFilmRqDto());
+
+        var response = mockMvc.perform(get("/films/{id}", createdFilm.getId()))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        var film = objectMapper.readValue(response, FilmRsDto.class);
+        assertThat(film.getId()).isEqualTo(createdFilm.getId());
+        assertThat(film.getGenres())
+                .extracting(GenreDto::getId)
+                .containsExactlyInAnyOrder(1L, 4L);
+        assertThat(film.getGenres())
+                .allMatch(genre -> genre.getName() != null && !genre.getName().isBlank());
+    }
+
+    @Test
     void updateFilm() throws Exception {
         var createRequest = validFilmRqDto();
         createRequest.setId(null);
@@ -202,7 +223,10 @@ class FilmControllerIntegrationTest {
         mockMvc.perform(put("/films/{id}/like/{userId}", film.getId(), userId))
                 .andExpect(status().isOk());
 
-        assertThat(filmStorage.getFilmById(film.getId()).orElseThrow().getLikedUsers()).contains(userId);
+        Set<Long> actualLikedUserIds = filmStorage.getFilmById(film.getId()).orElseThrow().getLikedUsers().stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        assertThat(actualLikedUserIds).contains(userId);
     }
 
     @Test
@@ -215,7 +239,10 @@ class FilmControllerIntegrationTest {
         mockMvc.perform(delete("/films/{id}/like/{userId}", film.getId(), userId))
                 .andExpect(status().isOk());
 
-        assertThat(filmStorage.getFilmById(film.getId()).orElseThrow().getLikedUsers()).doesNotContain(userId);
+        Set<Long> actualLikedUserIds = filmStorage.getFilmById(film.getId()).orElseThrow().getLikedUsers().stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        assertThat(actualLikedUserIds).doesNotContain(userId);
     }
 
     @Test
@@ -258,6 +285,12 @@ class FilmControllerIntegrationTest {
     void popular_zeroCount() throws Exception {
         mockMvc.perform(get("/films/popular").param("count", "0"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void popular_emptyList() throws Exception {
+        var films = fetchPopularFilms();
+        assertThat(films).isEmpty();
     }
 
     private FilmRqDto validFilmRqDto() {
