@@ -5,16 +5,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import ru.yandex.practicum.filmorate.dto.UserDto;
+import ru.yandex.practicum.filmorate.model.User;
 import ru.yandex.practicum.filmorate.service.UserService;
 import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -36,11 +40,15 @@ class UserControllerIntegrationTest {
     private UserService userService;
 
     @Autowired
+    @Qualifier("userDbStorage")
     private UserStorage userStorage;
+
+    private int userSeq;
 
     @BeforeEach
     void setUp() {
         userService.clearUsers();
+        userSeq = 0;
     }
 
     @Test
@@ -167,8 +175,8 @@ class UserControllerIntegrationTest {
         mockMvc.perform(put("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
 
-        assertThat(userStorage.getUserById(firstUser.getId()).orElseThrow().getFriends()).contains(secondUser.getId());
-        assertThat(userStorage.getUserById(secondUser.getId()).orElseThrow().getFriends()).contains(firstUser.getId());
+        assertThat(getUserFriendIds(firstUser)).contains(secondUser.getId());
+        assertThat(getUserFriendIds(secondUser)).isEmpty();
     }
 
     @Test
@@ -195,14 +203,20 @@ class UserControllerIntegrationTest {
 
         mockMvc.perform(put("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
+        assertThat(getUserFriendIds(firstUser)).contains(secondUser.getId());
+        assertThat(getUserFriendIds(secondUser)).doesNotContain(firstUser.getId());
 
         mockMvc.perform(delete("/users/{id}/friends/{friendId}", firstUser.getId(), secondUser.getId()))
                 .andExpect(status().isOk());
 
-        assertThat(userStorage.getUserById(firstUser.getId()).orElseThrow().getFriends())
-                .doesNotContain(secondUser.getId());
-        assertThat(userStorage.getUserById(secondUser.getId()).orElseThrow().getFriends())
-                .doesNotContain(firstUser.getId());
+        assertThat(getUserFriendIds(firstUser)).doesNotContain(secondUser.getId());
+        assertThat(getUserFriendIds(secondUser)).doesNotContain(firstUser.getId());
+    }
+
+    private Set<Long> getUserFriendIds(UserDto firstUser) {
+        return userStorage.getUserFriends(firstUser.getId()).stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
     }
 
     @Test
@@ -282,28 +296,23 @@ class UserControllerIntegrationTest {
     }
 
     private UserDto validUserDto() {
-        var dto = new UserDto();
-        dto.setEmail("john@example.com");
-        dto.setLogin("john_doe");
-        dto.setName("John Doe");
-        dto.setBirthday(LocalDate.of(2000, 1, 1));
-        return dto;
+        return newUserDto("john", "John Doe");
     }
 
     private UserDto secondUserDto() {
-        var dto = new UserDto();
-        dto.setEmail("alice@example.com");
-        dto.setLogin("alice");
-        dto.setName("Alice");
-        dto.setBirthday(LocalDate.of(1999, 5, 20));
-        return dto;
+        return newUserDto("alice", "Alice");
     }
 
     private UserDto thirdUserDto() {
+        return newUserDto("bob", "Bob");
+    }
+
+    private UserDto newUserDto(String prefix, String name) {
+        int id = ++userSeq;
         var dto = new UserDto();
-        dto.setEmail("bob@example.com");
-        dto.setLogin("bob");
-        dto.setName("Bob");
+        dto.setEmail(prefix + id + "@example.com");
+        dto.setLogin(prefix + "_" + id);
+        dto.setName(name);
         dto.setBirthday(LocalDate.of(1998, 8, 15));
         return dto;
     }
