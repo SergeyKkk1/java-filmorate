@@ -1,12 +1,18 @@
 package ru.yandex.practicum.filmorate.dto.mapper;
 
 import org.mapstruct.Mapper;
-import ru.yandex.practicum.filmorate.dto.FilmDto;
+import org.mapstruct.Mapping;
+import org.mapstruct.NullValueCheckStrategy;
+import ru.yandex.practicum.filmorate.dto.FilmRqDto;
+import ru.yandex.practicum.filmorate.dto.FilmRsDto;
 import ru.yandex.practicum.filmorate.model.Film;
 
-@Mapper
+@Mapper(nullValueCheckStrategy = NullValueCheckStrategy.ALWAYS)
 public interface FilmMapper {
-    FilmDto mapToDto(Film film);
+    @Mapping(target = "mpa", source = "contentRating")
+    FilmRsDto mapToRsDto(Film film);
 
-    Film map(FilmDto filmDto);
+    @Mapping(target = "contentRating", source = "mpa")
+    @Mapping(target = "likedUsers", ignore = true)
+    Film map(FilmRqDto filmRqDto);
 }

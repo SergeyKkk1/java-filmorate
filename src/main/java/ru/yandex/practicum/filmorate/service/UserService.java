@@ -2,6 +2,7 @@ package ru.yandex.practicum.filmorate.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import ru.yandex.practicum.filmorate.dto.UserDto;
 import ru.yandex.practicum.filmorate.dto.mapper.UserMapper;
@@ -12,13 +13,14 @@ import ru.yandex.practicum.filmorate.storage.user.UserStorage;
 
 import java.util.HashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class UserService {
+    @Qualifier("userDbStorage")
     private final UserStorage userStorage;
     private final UserMapper userMapper;
 
@@ -41,12 +43,11 @@ public class UserService {
         User user = userMapper.map(userDto);
         log.info("Updating user: {} with id {}", user.getLogin(), user.getId());
         normalizeUserName(user);
-        User updatedUser = getRequiredUser(user.getId());
-
-        updatedUser.setEmail(user.getEmail());
-        updatedUser.setLogin(user.getLogin());
-        updatedUser.setName(user.getName());
-        updatedUser.setBirthday(user.getBirthday());
+        User updatedUser = getRequiredUser(user.getId())
+                .setEmail(user.getEmail())
+                .setLogin(user.getLogin())
+                .setName(user.getName())
+                .setBirthday(user.getBirthday());
         userStorage.updateUser(updatedUser);
 
         return userMapper.mapToDto(updatedUser);
@@ -65,33 +66,23 @@ public class UserService {
     public void addFriend(Long id, Long friendId) {
         log.info("Adding friend: user {} -> friend {}", id, friendId);
         validateDifferentUserIds(id, friendId);
-        User user = getRequiredUser(id);
-        User friend = getRequiredUser(friendId);
-        user.getFriends().add(friendId);
-        friend.getFriends().add(id);
-
-        userStorage.updateUser(user);
-        userStorage.updateUser(friend);
+        getRequiredUser(id);
+        getRequiredUser(friendId);
+        userStorage.addFriend(id, friendId);
     }
 
     public void deleteFriend(Long id, Long friendId) {
         log.info("Deleting friend: user {} -> friend {}", id, friendId);
         validateDifferentUserIds(id, friendId);
-        User user = getRequiredUser(id);
-        User friend = getRequiredUser(friendId);
-        user.getFriends().remove(friendId);
-        friend.getFriends().remove(id);
-
-        userStorage.updateUser(user);
-        userStorage.updateUser(friend);
+        getRequiredUser(id);
+        getRequiredUser(friendId);
+        userStorage.deleteFriend(id, friendId);
     }
 
     public List<UserDto> getFriends(Long id) {
         log.info("Fetching friends for user {}", id);
-        User user = getRequiredUser(id);
-        return user.getFriends().stream()
-                .map(userStorage::getUserById)
-                .flatMap(Optional::stream)
+        getRequiredUser(id);
+        return userStorage.getUserFriends(id).stream()
                 .map(userMapper::mapToDto)
                 .toList();
     }
@@ -104,12 +95,13 @@ public class UserService {
     public List<UserDto> getCommonFriends(Long id, Long otherId) {
         log.info("Fetching common friends for users {} and {}", id, otherId);
         validateDifferentUserIds(id, otherId);
-        User firstUser = getRequiredUser(id);
-        User secondUser = getRequiredUser(otherId);
-        Set<Long> commonFriendIds = new HashSet<>(firstUser.getFriends());
-        commonFriendIds.retainAll(secondUser.getFriends());
-        return commonFriendIds.stream()
-                .map(this::getRequiredUser)
+        getRequiredUser(id);
+        getRequiredUser(otherId);
+        Set<Long> userFriendIds = userStorage.getUserFriends(id).stream().map(User::getId).collect(Collectors.toSet());
+        Set<Long> otherFriendIds = userStorage.getUserFriends(otherId).stream().map(User::getId).collect(Collectors.toSet());
+        Set<Long> commonFriendIds = new HashSet<>(userFriendIds);
+        commonFriendIds.retainAll(otherFriendIds);
+        return userStorage.getUsers(commonFriendIds).stream()
                 .map(userMapper::mapToDto)
                 .toList();
     }

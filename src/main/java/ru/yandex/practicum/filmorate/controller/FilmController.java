@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import ru.yandex.practicum.filmorate.dto.FilmDto;
+import ru.yandex.practicum.filmorate.dto.FilmRqDto;
+import ru.yandex.practicum.filmorate.dto.FilmRsDto;
 import ru.yandex.practicum.filmorate.exception.FilmIdIsNullException;
 import ru.yandex.practicum.filmorate.exception.ValidationException;
 import ru.yandex.practicum.filmorate.service.FilmService;
@@ -25,17 +26,25 @@ public class FilmController {
     private final FilmService filmService;
 
     @GetMapping
-    public List<FilmDto> getFilms() {
+    public List<FilmRsDto> getFilms() {
         return filmService.getFilms();
     }
 
+    @GetMapping("/{id}")
+    public FilmRsDto getFilm(@PathVariable Long id) {
+        if (id == null) {
+            throw new FilmIdIsNullException("Film id is null");
+        }
+        return filmService.getFilm(id);
+    }
+
     @PostMapping
-    public FilmDto addFilm(@Valid @RequestBody FilmDto film) {
+    public FilmRsDto addFilm(@Valid @RequestBody FilmRqDto film) {
         return filmService.addFilm(film);
     }
 
     @PutMapping
-    public FilmDto updateFilm(@Valid @RequestBody FilmDto film) {
+    public FilmRsDto updateFilm(@Valid @RequestBody FilmRqDto film) {
         if (film.getId() == null) {
             throw new FilmIdIsNullException("Film id is null");
         }
@@ -59,7 +68,7 @@ public class FilmController {
     }
 
     @GetMapping("/popular")
-    public List<FilmDto> popular(@RequestParam(defaultValue = "10") int count) {
+    public List<FilmRsDto> popular(@RequestParam(defaultValue = "10") int count) {
         if (count <= 0) {
             throw new ValidationException("Count must be positive");
         }

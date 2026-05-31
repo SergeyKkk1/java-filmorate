@@ -5,12 +5,16 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import lombok.experimental.Accessors;
 import ru.yandex.practicum.filmorate.dto.validation.After;
 
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 @Data
-public class FilmDto {
+@Accessors(chain = true)
+public class FilmRqDto {
     private Long id;
     @NotBlank
     private String name;
@@ -22,4 +26,7 @@ public class FilmDto {
     @Positive
     @NotNull
     private Integer duration;
+
+    private IdDto mpa;
+    private Set<IdDto> genres = new HashSet<>();
 }
